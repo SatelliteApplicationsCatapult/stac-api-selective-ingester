@@ -1,5 +1,6 @@
 const collectionUtils = require("./utilities.js");
 const axios = require("axios");
+const { throws } = require("assert");
 
 class StacSelectiveIngester {
   constructor(
@@ -29,32 +30,63 @@ class StacSelectiveIngester {
     this.newlyStoredCollections = [];
     this.updatedCollectionsCount = 0;
     this.updatedCollections = [];
+    this.newlyAddedItemsCount = 0;
+    this.updatedItemsCount = 0;
+    this.itemsAlreadyPresentCount = 0;
+  }
+
+  get_num_updated_collections() {
+    return this.updatedCollectionsCount;
+  }
+
+  get_num_newly_stored_collections() {
+    return this.newlyStoredCollectionsCount;
+  }
+  get_newly_stored_collections() {
+    return this.newlyStoredCollections;
+  }
+  get_updated_collections() {
+    return this.updatedCollections;
   }
 
   async getAllItems() {
     let itemsUrl = this.startUrl;
     while (itemsUrl) {
       let response;
-      console.log(`Making request to ${itemsUrl}`);
       response = await axios.get(itemsUrl);
+      itemsUrl = undefined;
       const data = response.data;
       const feautures = data.features;
+      let storeItemsPromises = [];
       for (let i = 0; i < feautures.length; i++) {
         const item = feautures[i];
         const sourceStacApiCollectionUrl = item.links.find(
           (link) => link.rel === "collection"
         ).href;
         await this.storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl);
+        let collectionId = sourceStacApiCollectionUrl.split("/").pop();
+        collectionUtils.removeRelsFromLinks(item);
+        //await this.storeItemInBigStack(item, collectionId);
+        storeItemsPromises.push(this.storeItemInBigStack(item, collectionId));
+        // if number can be divided by 10
+        if (i % 10 === 0) {
+          await Promise.all(storeItemsPromises);
+        }
       }
 
-      const nextCollectionLink = data.links.find((link) => link.rel === "next");
-      if (nextCollectionLink) {
-        itemsUrl = nextCollectionLink.href;
+      await Promise.all(storeItemsPromises);
+      console.log("Resolved all promises");
+
+      const nextItemSetLink = data.links.find((link) => link.rel === "next");
+      if (nextItemSetLink) {
+        itemsUrl = nextItemSetLink.href;
         console.log("Getting next page...", itemsUrl);
       } else {
-        itemsUrl = undefined;
+        console.log("Stopping at last page.");
+        break;
       }
     }
+    return "Done";
   }
 
   async storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl) {
@@ -94,23 +126,44 @@ class StacSelectiveIngester {
    * @param {Object.<string, Object>} item
    */
   async storeItemInBigStack(item, collectionId) {
-    console.log("Storing item: ", item.id);
-    const itemsEndpoint =
-      process.env.BIG_STAC_API_ROOT + "/collections/" + collectionId + "/items";
-
-    try {
-      let response = await axios.post(itemsEndpoint, item);
-      console.log("Stored item: ", response.data.id);
-    } catch (error) {
-      if (error.response && error.response.data && error.response.data.code) {
-        const message = error.response.data.code;
-
-        if (message === "ConflictError")
-          console.log(`Item ${item.id} already exists.`);
-      } else {
-        console.log(`Error storing item ${item.id}: ${error}`);
+    return new Promise(async (resolve, reject) => {
+      console.log("Storing item: ", item.id);
+      const itemsEndpoint =
+        this.targetStacApiUrl + "/collections/" + collectionId + "/items";
+      try {
+        let response = await axios.post(itemsEndpoint, item);
+        console.log("Stored item: ", response.data.id);
+        this.newlyAddedItemsCount++;
+        return resolve("Stored item: ", response.data.id);
+      } catch (error) {
+        if (error.response && error.response.data && error.response.data.code) {
+          const message = error.response.data.code;
+          if (message === "ConflictError") {
+            if (this.update === false) {
+              console.log(`Item ${item.id} already exists.`);
+              this.itemsAlreadyPresentCount++;
+              return resolve(`Item ${item.id} already exists.`);
+            } else {
+              try {
+                let response = await axios.put(
+                  itemsEndpoint + "/" + item.id,
+                  item
+                );
+                this.updatedItemsCount++;
+                console.log("Updated item: ", response.data.id);
+                return resolve("Updated item: ", response.data.id);
+              } catch (error) {
+                console.error(`Error updating item ${item.id}`, error);
+                return reject(error);
+              }
+            }
+          } else {
+            console.log(`Error storing item ${item.id}: ${error}`);
+            return reject(error);
+          }
+        }
       }
-    }
+    });
   }
 }
 
