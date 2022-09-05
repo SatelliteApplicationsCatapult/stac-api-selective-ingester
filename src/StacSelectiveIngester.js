@@ -35,20 +35,51 @@ class StacSelectiveIngester {
     this.itemsAlreadyPresentCount = 0;
   }
 
-  get_num_updated_collections() {
+  getNumUpdatedCollections() {
     return this.updatedCollectionsCount;
   }
 
-  get_num_newly_stored_collections() {
-    return this.newlyStoredCollectionsCount;
-  }
-  get_newly_stored_collections() {
-    return this.newlyStoredCollections;
-  }
-  get_updated_collections() {
+  getUpdatedCollectionNames() {
     return this.updatedCollections;
   }
 
+  getNumNewlyStoredCollections() {
+    return this.newlyStoredCollectionsCount;
+  }
+  getNewlyStoredCollectionNames() {
+    return this.newlyStoredCollections;
+  }
+
+  getNumNewlyAddedItems() {
+    return this.newlyAddedItemsCount;
+  }
+
+  getNumUpdatedItems() {
+    return this.updatedItemsCount;
+  }
+
+  getNumItemsAlreadyPresent() {
+    return this.itemsAlreadyPresentCount;
+  }
+
+  async _reportProgressToEndpont() {
+    const data = {
+      id: this.callbackId,
+      newlyStoredCollectionsCount: this.newlyStoredCollectionsCount,
+      updatedCollectionsCount: this.updatedCollectionsCount,
+      newlyAddedItemsCount: this.newlyAddedItemsCount,
+      updatedItemsCount: this.updatedItemsCount,
+      itemsAlreadyPresentCount: this.itemsAlreadyPresentCount,
+    };
+    console.info(data);
+    if (this.callbackUrl && this.callbackId) {
+      try {
+        await axios.post(this.callbackUrl, data);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
   async getAllItems() {
     let itemsUrl = this.startUrl;
     while (itemsUrl) {
@@ -63,12 +94,10 @@ class StacSelectiveIngester {
         const sourceStacApiCollectionUrl = item.links.find(
           (link) => link.rel === "collection"
         ).href;
-        await this.storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl);
+        await this._storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl);
         let collectionId = sourceStacApiCollectionUrl.split("/").pop();
         collectionUtils.removeRelsFromLinks(item);
-        //await this.storeItemInBigStack(item, collectionId);
-        storeItemsPromises.push(this.storeItemInBigStack(item, collectionId));
-        // if number can be divided by 10
+        storeItemsPromises.push(this._storeItemInBigStack(item, collectionId));
         if (i % 10 === 0) {
           await Promise.all(storeItemsPromises);
         }
@@ -86,10 +115,10 @@ class StacSelectiveIngester {
         break;
       }
     }
-    return "Done";
+    this._reportProgressToEndpont();
   }
 
-  async storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl) {
+  async _storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl) {
     if (this.processedCollections.includes(sourceStacApiCollectionUrl)) {
       return;
     }
@@ -113,19 +142,13 @@ class StacSelectiveIngester {
         this.updatedCollectionsCount++;
         this.updatedCollections.push(sourceStacApiCollectionUrl);
       } else {
-        console.log(`Error storing collection ${collection.data.id}`);
-        console.error(error);
+        console.error(`Error storing collection ${collection.data.id}`, error);
       }
     }
     this.processedCollections.push(sourceStacApiCollectionUrl);
   }
-  /**
-   * Stores the item in our big stack.
-   *
-   * Currently, this function just stores it into local list.
-   * @param {Object.<string, Object>} item
-   */
-  async storeItemInBigStack(item, collectionId) {
+
+  async _storeItemInBigStack(item, collectionId) {
     return new Promise(async (resolve, reject) => {
       console.log("Storing item: ", item.id);
       const itemsEndpoint =
@@ -158,7 +181,7 @@ class StacSelectiveIngester {
               }
             }
           } else {
-            console.log(`Error storing item ${item.id}: ${error}`);
+            console.error(`Error storing item ${item.id}: ${error}`);
             return reject(error);
           }
         }

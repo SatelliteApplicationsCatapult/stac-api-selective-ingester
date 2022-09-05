@@ -7,6 +7,9 @@ app.use(express.json());
 
 app.use(express_queue({ activeLimit: 1, queuedLimit: -1 }));
 
+// declare a js queue
+let _executionQueue = [];
+
 app.post("/ingest", async (req, res) => {
   let body = req.body;
   let sourceStacApiUrl = body.source_stac_api_url;
@@ -43,10 +46,7 @@ app.post("/ingest", async (req, res) => {
   delete body.callbackId;
   console.log("Callback id: ", callbackId);
 
-  // let url = `${sourceStacApiUrl}/search?${Object.keys(body).map(
-  //   (element) => `${element}=${req.body[element]}`
-  // )}&limit=1000`.replace(",", "&");
-  let url = `${sourceStacApiUrl}/search?limit=1000&`;
+  let url = `${sourceStacApiUrl}/search?limit=100&`;
   for (let key in body) {
     //console.log("key: ", key);
     let value = body[key];
@@ -68,17 +68,15 @@ app.post("/ingest", async (req, res) => {
     callbackId
   );
   try {
-    await stacSelectiveIngester.getAllItems();
-    // let response = {
-    //   num_updated_collections:
-    //     stacSelectiveIngester.get_num_updated_collections(),
-    //   num_newly_stored_collections:
-    //     stacSelectiveIngester.get_num_newly_stored_collections(),
-    //   newly_stored_collections:
-    //     stacSelectiveIngester.get_newly_stored_collections(),
-    //   updated_collections: stacSelectiveIngester.get_updated_collections(),
-    // };
-    return res.status(200).send("Accepted");
+    _executionQueue.push(stacSelectiveIngester);
+    let executionQueueLength = _executionQueue.length;
+    let operationsPendingBeforeThisOne = executionQueueLength - 1;
+    return res
+      .status(200)
+      .send(
+        "Accepted, number of operations in queue before this one: " +
+          operationsPendingBeforeThisOne
+      );
   } catch (error) {
     console.log(error);
     return res.status(400).send(error);
@@ -86,3 +84,16 @@ app.post("/ingest", async (req, res) => {
 });
 
 app.listen(9001, "0.0.0.0");
+console.log("Listening on port 9001");
+
+async function run() {
+  while (true) {
+    if (_executionQueue.length > 0) {
+      /** @type {StacSelectiveIngester}*/
+      let execution = _executionQueue.shift();
+      await execution.getAllItems();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+run();
