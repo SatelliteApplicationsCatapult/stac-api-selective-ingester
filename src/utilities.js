@@ -3,13 +3,19 @@
  * @param {Object.<string, Object>} collection
  */
 function addProviderToCollection(collection) {
-  collection.providers.push({
-    name: process.env.PROVIDER_NAME || "Sattelite Applications Catapult",
-    url:
-      process.env.PROVIDER_URL ||
-      "https://www.satteliteapplicationscatapult.com",
-    roles: ["host"],
-  });
+  const SET_PROVIDER =
+    process.env.STAC_API_SELECTIVE_INGESTER_PROVIDER_SET_HOST_PROVIDER || true;
+  if (SET_PROVIDER) {
+    collection.providers.push({
+      name:
+        process.env.STAC_API_SELECTIVE_INGESTER_PROVIDER_NAME ||
+        "Sattelite Applications Catapult",
+      url:
+        process.env.STAC_API_SELECTIVE_INGESTER_PROVIDER_URL ||
+        "https://sa.catapult.org.uk/",
+      roles: ["host"],
+    });
+  }
 }
 
 /**

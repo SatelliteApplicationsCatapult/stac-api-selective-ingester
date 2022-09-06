@@ -66,7 +66,9 @@ class StacSelectiveIngester {
     const data = {
       id: this.callbackId,
       newlyStoredCollectionsCount: this.newlyStoredCollectionsCount,
+      newlyStoredCollectionsNames: this.newlyStoredCollections,
       updatedCollectionsCount: this.updatedCollectionsCount,
+      updateedCollectionsNames: this.updatedCollections,
       newlyAddedItemsCount: this.newlyAddedItemsCount,
       updatedItemsCount: this.updatedItemsCount,
       itemsAlreadyPresentCount: this.itemsAlreadyPresentCount,

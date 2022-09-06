@@ -1,10 +1,9 @@
 const express = require("express");
 const express_queue = require("express-queue");
-// import fetch from "node-fetch";
 const ingester = require("./StacSelectiveIngester.js");
 const app = express();
+const fs = require("fs");
 app.use(express.json());
-
 app.use(express_queue({ activeLimit: 1, queuedLimit: -1 }));
 
 // declare a js queue
@@ -83,9 +82,18 @@ app.post("/ingest", async (req, res) => {
   }
 });
 
-app.listen(9001, "0.0.0.0");
-console.log("Listening on port 9001");
+function isDocker() {
+  return fs.existsSync("/.dockerenv");
+}
 
+if (isDocker()) {
+  app.listen(80, "0.0.0.0");
+  console.log("Listening on port 80");
+  // TODO: For some reason this does not work on azure ACI
+} else {
+  app.listen(80, "0.0.0.0");
+  console.log("Listening on port 80");
+}
 async function run() {
   while (true) {
     if (_executionQueue.length > 0) {
