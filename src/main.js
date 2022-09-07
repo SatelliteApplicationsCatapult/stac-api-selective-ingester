@@ -38,12 +38,9 @@ app.post("/ingest", async (req, res) => {
   }
   delete body.update;
   console.log("Update flag: ", update);
-  let callbackEndpoint = body.callbackEndpoint;
-  delete body.callbackEndpoint;
+  let callbackEndpoint = body.callback_endpoint;
+  delete body.callback_endpoint;
   console.log("Callback endpoint: ", callbackEndpoint);
-  let callbackId = body.callbackId;
-  delete body.callbackId;
-  console.log("Callback id: ", callbackId);
 
   let url = `${sourceStacApiUrl}/search?limit=100&`;
   for (let key in body) {
@@ -63,9 +60,7 @@ app.post("/ingest", async (req, res) => {
     url,
     targetStacApiUrl,
     update,
-    callbackEndpoint,
-    callbackId
-  );
+    callbackEndpoint  );
   try {
     _executionQueue.push(stacSelectiveIngester);
     let executionQueueLength = _executionQueue.length;

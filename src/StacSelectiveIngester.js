@@ -9,7 +9,6 @@ class StacSelectiveIngester {
     targetStacApiUrl,
     update = false,
     callbackUrl = undefined,
-    callbackId = undefined
   ) {
     // remove trailing slash if it exists on sourceApiUrl
     if (sourceApiUrl.endsWith("/")) {
@@ -24,7 +23,11 @@ class StacSelectiveIngester {
     }
     this.update = update;
     this.callbackUrl = callbackUrl;
-    this.callbackId = callbackId;
+    // if callbackUrl ends with slash, remove it
+    if (this.callbackUrl && this.callbackUrl.endsWith("/")) {
+      this.callbackUrl = this.callbackUrl.slice(0, -1);
+    }
+
     this.processedCollections = [];
     this.newlyStoredCollectionsCount = 0;
     this.newlyStoredCollections = [];
@@ -33,6 +36,8 @@ class StacSelectiveIngester {
     this.newlyAddedItemsCount = 0;
     this.updatedItemsCount = 0;
     this.itemsAlreadyPresentCount = 0;
+    // console.log self json
+    console.log(JSON.stringify(this, null, 2));
   }
 
   getNumUpdatedCollections() {
@@ -63,18 +68,20 @@ class StacSelectiveIngester {
   }
 
   async _reportProgressToEndpont() {
+    if (this.callbackUrl) {
+      console.log("Reporting progress to endpoint: ", this.callbackUrl);
+    }
     const data = {
-      id: this.callbackId,
-      newlyStoredCollectionsCount: this.newlyStoredCollectionsCount,
-      newlyStoredCollectionsNames: this.newlyStoredCollections,
-      updatedCollectionsCount: this.updatedCollectionsCount,
-      updateedCollectionsNames: this.updatedCollections,
-      newlyAddedItemsCount: this.newlyAddedItemsCount,
-      updatedItemsCount: this.updatedItemsCount,
-      itemsAlreadyPresentCount: this.itemsAlreadyPresentCount,
+      newly_stored_collections_count: this.newlyStoredCollectionsCount,
+      newly_stored_collections: this.newlyStoredCollections,
+      updated_collections_count: this.updatedCollectionsCount,
+      updated_collections: this.updatedCollections,
+      newly_stored_items_count: this.newlyAddedItemsCount,
+      updated_items_count: this.updatedItemsCount,
+      already_stored_items_count: this.itemsAlreadyPresentCount,
     };
     console.info(data);
-    if (this.callbackUrl && this.callbackId) {
+    if (this.callbackUrl) {
       try {
         await axios.post(this.callbackUrl, data);
       } catch (error) {
