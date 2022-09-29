@@ -12,7 +12,7 @@ with any other optional flags (for example to replace already present records or
 
 ### Starting the ingest
 
-Make a post request to /ingest endpoint.
+Make a post request to / endpoint.
 <br>
 At minimum, your request must have source and target stac api urls. You should have get request permision for source stac-api and get,post and put request permision on target stac-api server.
 <br>
@@ -21,13 +21,9 @@ Additional "update" paramter can be set to true, which will do an update of item
 In addition to target and source stac api urls, all aditional search query params from official stac-item search standard can be used. <br> 
 Those are available at: https://github.com/radiantearth/stac-api-spec/tree/main/item-search#Query%20Parameter%20Table <br>
 
-Example of ingest request created with postman: <br>
-![](img/example1.png)
 
 ## Deploying
-Meant to be running on Azure serverless ACI. Will run the selective ingestation
-once the ingest request is sent.
-
+Meant to be running on Azure serverless ACI.
 ## Environment Variables
 
 | Env var | Used for | Default |

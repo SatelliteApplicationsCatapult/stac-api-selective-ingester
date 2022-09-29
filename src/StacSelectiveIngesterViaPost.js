@@ -1,14 +1,14 @@
 const collectionUtils = require("./utilities.js");
 const axios = require("axios");
-const { throws } = require("assert");
 
-class StacSelectiveIngester {
+class StacSelectiveIngesterViaPost {
   constructor(
     sourceApiUrl,
     startUrl,
+    startBody,
     targetStacApiUrl,
     update = false,
-    callbackUrl = undefined,
+    callbackUrl = undefined
   ) {
     // remove trailing slash if it exists on sourceApiUrl
     if (sourceApiUrl.endsWith("/")) {
@@ -27,7 +27,7 @@ class StacSelectiveIngester {
     if (this.callbackUrl && this.callbackUrl.endsWith("/")) {
       this.callbackUrl = this.callbackUrl.slice(0, -1);
     }
-
+    this.startBody = startBody;
     this.processedCollections = [];
     this.newlyStoredCollectionsCount = 0;
     this.newlyStoredCollections = [];
@@ -36,8 +36,6 @@ class StacSelectiveIngester {
     this.newlyAddedItemsCount = 0;
     this.updatedItemsCount = 0;
     this.itemsAlreadyPresentCount = 0;
-    // console.log self json
-    console.log(JSON.stringify(this, null, 2));
   }
 
   getNumUpdatedCollections() {
@@ -67,10 +65,7 @@ class StacSelectiveIngester {
     return this.itemsAlreadyPresentCount;
   }
 
-  async _reportProgressToEndpont() {
-    if (this.callbackUrl) {
-      console.log("Reporting progress to endpoint: ", this.callbackUrl);
-    }
+  _make_report() {
     const data = {
       newly_stored_collections_count: this.newlyStoredCollectionsCount,
       newly_stored_collections: this.newlyStoredCollections,
@@ -80,7 +75,14 @@ class StacSelectiveIngester {
       updated_items_count: this.updatedItemsCount,
       already_stored_items_count: this.itemsAlreadyPresentCount,
     };
-    console.info(data);
+    return data;
+  }
+
+  async _reportProgressToEndpont() {
+    if (this.callbackUrl) {
+      console.log("Reporting progress to endpoint: ", this.callbackUrl);
+    }
+    const data = this._make_report();
     if (this.callbackUrl) {
       try {
         await axios.post(this.callbackUrl, data);
@@ -91,10 +93,12 @@ class StacSelectiveIngester {
   }
   async getAllItems() {
     let itemsUrl = this.startUrl;
+    let itemsBody = this.startBody;
     while (itemsUrl) {
       let response;
-      response = await axios.get(itemsUrl);
+      response = await axios.post(itemsUrl, itemsBody);
       itemsUrl = undefined;
+      itemsBody = undefined;
       const data = response.data;
       const feautures = data.features;
       let storeItemsPromises = [];
@@ -118,6 +122,7 @@ class StacSelectiveIngester {
       const nextItemSetLink = data.links.find((link) => link.rel === "next");
       if (nextItemSetLink) {
         itemsUrl = nextItemSetLink.href;
+        itemsBody = nextItemSetLink.body;
         console.log("Getting next page...", itemsUrl);
       } else {
         console.log("Stopping at last page.");
@@ -125,6 +130,7 @@ class StacSelectiveIngester {
       }
     }
     this._reportProgressToEndpont();
+    return this._make_report();
   }
 
   async _storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl) {
@@ -199,4 +205,4 @@ class StacSelectiveIngester {
   }
 }
 
-module.exports = { StacSelectiveIngester };
+module.exports = { StacSelectiveIngesterViaPost };

@@ -1,3 +1,5 @@
+const axios = require("axios");
+
 /**
  * Addends the provider from the environment to the collection
  * @param {Object.<string, Object>} collection
@@ -28,7 +30,13 @@ function removeRelsFromLinks(collection) {
   );
 }
 
+async function getStacVersionFromStacApi(apiRootUrl) {
+  let response = await axios.get(apiRootUrl);
+  return response.data.stac_version;
+}
+
 module.exports = {
   addProviderToCollection,
   removeRelsFromLinks,
+  getStacVersionFromStacApi,
 };
