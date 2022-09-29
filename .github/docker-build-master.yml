@@ -1,0 +1,19 @@
+name: Docker-build-master
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v2
+        - name: Build the Docker image
+          run: docker build . --file Dockerfile --tag stacpdadev.azurecr.io/stac-api-selective-ingester:latest
+        - name: Log in to the Docker Hub registry
+          run: echo "${{ secrets.DOCKERPASSWORD }}" | docker login -u "${{ secrets.DOCKERUSERNAME }}" --password-stdin
+        - name: Push the Docker image to Docker Hub
+          run: docker push stacpdadev.azurecr.io/stac-api-selective-ingester:latest
