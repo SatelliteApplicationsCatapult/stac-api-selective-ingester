@@ -8,7 +8,8 @@ class StacSelectiveIngesterViaPost {
     startBody,
     targetStacApiUrl,
     update = false,
-    callbackUrl = undefined
+    callbackUrl = undefined,
+    callbackId = undefined
   ) {
     // remove trailing slash if it exists on sourceApiUrl
     if (sourceApiUrl.endsWith("/")) {
@@ -27,6 +28,7 @@ class StacSelectiveIngesterViaPost {
     if (this.callbackUrl && this.callbackUrl.endsWith("/")) {
       this.callbackUrl = this.callbackUrl.slice(0, -1);
     }
+    this.callbackId = callbackId;
     this.startBody = startBody;
     this.processedCollections = [];
     this.newlyStoredCollectionsCount = 0;
@@ -74,6 +76,7 @@ class StacSelectiveIngesterViaPost {
       newly_stored_items_count: this.newlyAddedItemsCount,
       updated_items_count: this.updatedItemsCount,
       already_stored_items_count: this.itemsAlreadyPresentCount,
+      callback_id: this.callbackId,
     };
     return data;
   }

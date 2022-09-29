@@ -39,8 +39,10 @@ app.post(
     let callbackEndpoint = body.callback_endpoint;
     delete body.callback_endpoint;
     console.log("Callback endpoint: ", callbackEndpoint);
-
+    let callbackId = body.callback_id;
+    delete body.callback_id;
     const url = `${sourceStacApiUrl}/search`;
+    body.limit = 100;
 
     let stacSelectiveIngester =
       new ingesterViaPost.StacSelectiveIngesterViaPost(
@@ -49,7 +51,8 @@ app.post(
         body,
         targetStacApiUrl,
         update,
-        callbackEndpoint
+        callbackEndpoint,
+        callbackId,
       );
     try {
       const result = await stacSelectiveIngester.getAllItems();
