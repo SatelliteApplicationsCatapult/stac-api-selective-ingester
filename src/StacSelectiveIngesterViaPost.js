@@ -40,33 +40,6 @@ class StacSelectiveIngesterViaPost {
     this.itemsAlreadyPresentCount = 0;
   }
 
-  getNumUpdatedCollections() {
-    return this.updatedCollectionsCount;
-  }
-
-  getUpdatedCollectionNames() {
-    return this.updatedCollections;
-  }
-
-  getNumNewlyStoredCollections() {
-    return this.newlyStoredCollectionsCount;
-  }
-  getNewlyStoredCollectionNames() {
-    return this.newlyStoredCollections;
-  }
-
-  getNumNewlyAddedItems() {
-    return this.newlyAddedItemsCount;
-  }
-
-  getNumUpdatedItems() {
-    return this.updatedItemsCount;
-  }
-
-  getNumItemsAlreadyPresent() {
-    return this.itemsAlreadyPresentCount;
-  }
-
   _make_report() {
     const data = {
       newly_stored_collections_count: this.newlyStoredCollectionsCount,
@@ -99,12 +72,24 @@ class StacSelectiveIngesterViaPost {
     let itemsBody = this.startBody;
     while (itemsUrl) {
       let response;
-      response = await axios.post(itemsUrl, itemsBody);
+      try {
+        response = await axios.post(itemsUrl, itemsBody);
+      } catch (error) {
+        // wait 5 seconds and try again
+        console.error(error);
+        await new Promise((r) => setTimeout(r, 5000));
+        try {
+          response = await axios.post(itemsUrl, itemsBody);
+        } catch (error) {
+          console.error(error);
+          this._reportProgressToEndpont();
+          return this._make_report();
+        }
+      }
       itemsUrl = undefined;
       itemsBody = undefined;
       const data = response.data;
       const feautures = data.features;
-      let storeItemsPromises = [];
       for (let i = 0; i < feautures.length; i++) {
         const item = feautures[i];
         const sourceStacApiCollectionUrl = item.links.find(
@@ -113,20 +98,26 @@ class StacSelectiveIngesterViaPost {
         await this._storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl);
         let collectionId = sourceStacApiCollectionUrl.split("/").pop();
         collectionUtils.removeRelsFromLinks(item);
-        storeItemsPromises.push(this._storeItemInBigStack(item, collectionId));
-        if (i % 10 === 0) {
-          await Promise.all(storeItemsPromises);
+        try {
+          await this._storeItemInBigStack(item, collectionId);
+        }
+        catch (error) {
+          // wait 5 seconds and try again
+          await new Promise((r) => setTimeout(r, 5000));
+          try {
+            await this._storeItemInBigStack(item, collectionId);
+          }
+          catch (error) {
+            console.error(error);
+          }
         }
       }
-
-      await Promise.all(storeItemsPromises);
-      console.log("Resolved all promises");
-
       const nextItemSetLink = data.links.find((link) => link.rel === "next");
       if (nextItemSetLink) {
         itemsUrl = nextItemSetLink.href;
         itemsBody = nextItemSetLink.body;
         console.log("Getting next page...", itemsUrl);
+        console.log(JSON.stringify(itemsBody, null, 4));
       } else {
         console.log("Stopping at last page.");
         break;
@@ -168,42 +159,42 @@ class StacSelectiveIngesterViaPost {
 
   async _storeItemInBigStack(item, collectionId) {
     return new Promise(async (resolve, reject) => {
-      console.log("Storing item: ", item.id);
-      const itemsEndpoint =
-        this.targetStacApiUrl + "/collections/" + collectionId + "/items";
-      try {
-        let response = await axios.post(itemsEndpoint, item);
-        console.log("Stored item: ", response.data.id);
-        this.newlyAddedItemsCount++;
-        return resolve("Stored item: ", response.data.id);
-      } catch (error) {
-        if (error.response && error.response.data && error.response.data.code) {
-          const message = error.response.data.code;
-          if (message === "ConflictError") {
-            if (this.update === false) {
-              console.log(`Item ${item.id} already exists.`);
-              this.itemsAlreadyPresentCount++;
-              return resolve(`Item ${item.id} already exists.`);
-            } else {
-              try {
-                let response = await axios.put(
-                  itemsEndpoint + "/" + item.id,
-                  item
-                );
-                this.updatedItemsCount++;
-                console.log("Updated item: ", response.data.id);
-                return resolve("Updated item: ", response.data.id);
-              } catch (error) {
-                console.error(`Error updating item ${item.id}`, error);
-                return reject(error);
-              }
-            }
+    console.log("Storing item: ", item.id);
+    const itemsEndpoint =
+      this.targetStacApiUrl + "/collections/" + collectionId + "/items";
+    try {
+      let response = await axios.post(itemsEndpoint, item);
+      console.log("Stored item: ", response.data.id);
+      this.newlyAddedItemsCount++;
+      return resolve("Stored item: ", response.data.id);
+    } catch (error) {
+      if (error.response && error.response.data && error.response.data.code) {
+        const message = error.response.data.code;
+        if (message === "ConflictError") {
+          if (this.update === false) {
+            console.log(`Item ${item.id} already exists.`);
+            this.itemsAlreadyPresentCount++;
+            return resolve(`Item ${item.id} already exists.`);
           } else {
-            console.error(`Error storing item ${item.id}: ${error}`);
-            return reject(error);
+            try {
+              let response = await axios.put(
+                itemsEndpoint + "/" + item.id,
+                item
+              );
+              this.updatedItemsCount++;
+              console.log("Updated item: ", response.data.id);
+              return resolve("Updated item: ", response.data.id);
+            } catch (error) {
+              console.error(`Error updating item ${item.id}`, error);
+              return reject(error);
+            }
           }
+        } else {
+          console.error(`Error storing item ${item.id}: ${error}`);
+          return reject(error);
         }
       }
+    }
     });
   }
 }
