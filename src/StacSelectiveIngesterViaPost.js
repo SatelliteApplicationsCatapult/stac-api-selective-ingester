@@ -40,33 +40,6 @@ class StacSelectiveIngesterViaPost {
     this.itemsAlreadyPresentCount = 0;
   }
 
-  getNumUpdatedCollections() {
-    return this.updatedCollectionsCount;
-  }
-
-  getUpdatedCollectionNames() {
-    return this.updatedCollections;
-  }
-
-  getNumNewlyStoredCollections() {
-    return this.newlyStoredCollectionsCount;
-  }
-  getNewlyStoredCollectionNames() {
-    return this.newlyStoredCollections;
-  }
-
-  getNumNewlyAddedItems() {
-    return this.newlyAddedItemsCount;
-  }
-
-  getNumUpdatedItems() {
-    return this.updatedItemsCount;
-  }
-
-  getNumItemsAlreadyPresent() {
-    return this.itemsAlreadyPresentCount;
-  }
-
   _make_report() {
     const data = {
       newly_stored_collections_count: this.newlyStoredCollectionsCount,
@@ -99,12 +72,23 @@ class StacSelectiveIngesterViaPost {
     let itemsBody = this.startBody;
     while (itemsUrl) {
       let response;
-      response = await axios.post(itemsUrl, itemsBody);
+      for (let i = 0; i < 5; i++) {
+        try {
+          response = await axios.post(itemsUrl, itemsBody);
+          break;
+        } catch (error) {
+          await new Promise((r) => setTimeout(r, 5000));
+        }
+        if (i === 4) {
+          console.error("Could not get items after 5 tries.");
+          this._reportProgressToEndpont();
+          throw new Error("Could not get items after 5 tries.");
+        }
+      }
       itemsUrl = undefined;
       itemsBody = undefined;
       const data = response.data;
       const feautures = data.features;
-      let storeItemsPromises = [];
       for (let i = 0; i < feautures.length; i++) {
         const item = feautures[i];
         const sourceStacApiCollectionUrl = item.links.find(
@@ -113,20 +97,14 @@ class StacSelectiveIngesterViaPost {
         await this._storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl);
         let collectionId = sourceStacApiCollectionUrl.split("/").pop();
         collectionUtils.removeRelsFromLinks(item);
-        storeItemsPromises.push(this._storeItemInBigStack(item, collectionId));
-        if (i % 10 === 0) {
-          await Promise.all(storeItemsPromises);
-        }
+        await this._storeItemInBigStack(item, collectionId);
       }
-
-      await Promise.all(storeItemsPromises);
-      console.log("Resolved all promises");
-
       const nextItemSetLink = data.links.find((link) => link.rel === "next");
       if (nextItemSetLink) {
         itemsUrl = nextItemSetLink.href;
         itemsBody = nextItemSetLink.body;
         console.log("Getting next page...", itemsUrl);
+        console.log(JSON.stringify(itemsBody, null, 4));
       } else {
         console.log("Stopping at last page.");
         break;
@@ -134,6 +112,15 @@ class StacSelectiveIngesterViaPost {
     }
     this._reportProgressToEndpont();
     return this._make_report();
+  }
+
+  async _checkCollectionExistsOnTargetStacApi(collectionId) {
+    try {
+      await axios.get(`${this.targetStacApiUrl}/collections/${collectionId}`);
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   async _storeCollectionOnTargetStacApi(sourceStacApiCollectionUrl) {
@@ -164,6 +151,7 @@ class StacSelectiveIngesterViaPost {
       }
     }
     this.processedCollections.push(sourceStacApiCollectionUrl);
+    await new Promise((r) => setTimeout(r, 1000));
   }
 
   async _storeItemInBigStack(item, collectionId) {

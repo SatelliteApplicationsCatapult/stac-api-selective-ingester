@@ -64,6 +64,6 @@ app.post(
   }
 );
 
-let port = process.env.STAC_SELECTIVE_INGESTER_PORT || 7999;
+let port = process.env.STAC_SELECTIVE_INGESTER_PORT || 7001;
 app.listen(port, "0.0.0.0");
 console.log("Listening on port 80");
