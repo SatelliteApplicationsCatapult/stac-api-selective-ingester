@@ -77,12 +77,13 @@ class StacSelectiveIngesterViaPost {
           response = await axios.post(itemsUrl, itemsBody);
           break;
         } catch (error) {
-          await new Promise((r) => setTimeout(r, 5000));
-        }
-        if (i === 4) {
-          console.error("Could not get items after 5 tries.");
-          this._reportProgressToEndpont();
-          throw new Error("Could not get items after 5 tries.");
+          await new Promise((r) => setTimeout(r, 1000));
+          if (i < 4) {
+            console.log("Retrying...");
+            continue;
+          }
+          // console.error("Error getting items from source API", error);
+          throw error;
         }
       }
       itemsUrl = undefined;

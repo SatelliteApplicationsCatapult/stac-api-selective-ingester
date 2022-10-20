@@ -11,7 +11,7 @@ app.post(
     let body = req.body;
     let sourceStacApiUrl = body.source_stac_catalog_url;
     if (!sourceStacApiUrl) {
-      return res.status(400).send("source_stac_catalog_url not found in body");
+      return res.status(400).send({error:"source_stac_catalog_url not found in body"});
     }
     // if sourceStacApiUrl ends with a slash, remove it
     if (sourceStacApiUrl.endsWith("/")) {
@@ -22,7 +22,7 @@ app.post(
     console.log("Source stac api url: ", sourceStacApiUrl);
     let targetStacApiUrl = body.target_stac_catalog_url;
     if (!targetStacApiUrl) {
-      return res.status(400).send("target_stac_catalog_url not found in body");
+      return res.status(400).send({error:"target_stac_catalog_url not found in body"});
     }
     delete body.target_stac_catalog_url;
     console.log("Target stac api url: ", targetStacApiUrl);
@@ -52,14 +52,14 @@ app.post(
         targetStacApiUrl,
         update,
         callbackEndpoint,
-        callbackId,
+        callbackId
       );
     try {
       const result = await stacSelectiveIngester.getAllItems();
       return res.status(200).send(result);
     } catch (error) {
-      console.log(error);
-      return res.status(400).send(error);
+      // console.log the keys from the error object
+      return res.status(400).send({ error: error.response.data });
     }
   }
 );
