@@ -11,7 +11,7 @@ function addProviderToCollection(collection) {
     collection.providers.push({
       name:
         process.env.STAC_API_SELECTIVE_INGESTER_PROVIDER_NAME ||
-        "Sattelite Applications Catapult",
+        "Satellite Applications Catapult",
       url:
         process.env.STAC_API_SELECTIVE_INGESTER_PROVIDER_URL ||
         "https://sa.catapult.org.uk/",
